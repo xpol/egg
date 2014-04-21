@@ -698,6 +698,7 @@ blit_fn get_blit_function(EGGbyte alpha, EGGboolean colorkey, EGGImageFormat fmt
 void eggWritePixels(const void * data, EGGImageFormat fmt, EGGint dx, EGGint dy, EGGint width,  EGGint height, EGGint pitch)
 {
 	_EGGImage img;
+	union EGGImageCast cast = {&img};
 
 	img.format = fmt;
 	img.w = width;
@@ -706,7 +707,7 @@ void eggWritePixels(const void * data, EGGImageFormat fmt, EGGint dx, EGGint dy,
 	img.depth = 16;
 	img.pixels = (EGGubyte*)data;
 
-	eggDrawImage((EGGImage)(&img), dx, dy);
+	eggDrawImage(cast.handle, dx, dy);
 }
 
 EGG_API void eggFlush()
@@ -725,52 +726,56 @@ EGG_API void* eggDisplayBuffer()
 EGGImage eggCreateImage(EGGImageFormat fmt, EGGint width, EGGint height)
 {
 	EGGint pitch = width * 16/ 8;
-	_EGGImage *img = malloc(sizeof(*img) + pitch * height);
-	if (!img)
+	union EGGImageCast cast;
+	cast.image = malloc(sizeof(*cast.image) + pitch * height);
+	if (!cast.image)
 		return EGG_INVALID_HANDLE;
 
-	img->sig[0] = 'I';
-	img->sig[1] = 'M';
-	img->sig[2] = 'G';
-	img->sig[3] = '\0';
+	cast.image->sig[0] = 'I';
+	cast.image->sig[1] = 'M';
+	cast.image->sig[2] = 'G';
+	cast.image->sig[3] = '\0';
 
-	img->depth = 16; // we currently only support 16 bit images
-	img->format = fmt;
-	img->w = width;
-	img->h = height;
-	img->pitch = pitch;
-	img->pixels = (EGGubyte*)(img)+sizeof(*img);
+	cast.image->depth = 16; // we currently only support 16 bit images
+	cast.image->format = fmt;
+	cast.image->w = width;
+	cast.image->h = height;
+	cast.image->pitch = pitch;
+	cast.image->pixels = (EGGubyte*)(cast.image)+sizeof(*cast.image);
 	
-	return (EGGImage)img;
+	return cast.handle;
 }
 
 static void copy16(EGGImage image, const void * data, EGGint pitch, EGGint x, EGGint y, EGGint width, EGGint height)
 {
-	_EGGImage* img = (_EGGImage*)(image);
-	const EGGubyte* src = (const EGGubyte*)(data);
-	EGGubyte* dst = img->pixels + y*img->pitch + x*2;
-
 	int i;
+	union EGGImageCast cast;
+	const EGGubyte* src;
+	EGGubyte* dst;
+
+	cast.handle = image;
+
+	dst = cast.image->pixels + y*cast.image->pitch + x*2;
+	src = (const EGGubyte*)(data);
+
 	for (i = 0; i < height; i++)
 	{
 		memcpy(dst, src, pitch);
-		dst += img->pitch;
+		dst += cast.image->pitch;
 		src += pitch;
 	}
 }
 
 
 
-static void convert( EGGImage image, const void * data, EGGint pitch, EGGint x, EGGint y, EGGint width, EGGint height )
-{
-	 // converting not supported yet
-}
-
 void eggImageSubData(EGGImage image, const void * data, EGGint pitch, EGGint x, EGGint y, EGGint width, EGGint height)
 {
+	union EGGImageCast cast;
 	_EGGImage* img = (_EGGImage*)(image);
 	int left, bottom;
-	if (x >= (EGGint)img->w || y >= (EGGint)img->h)
+	cast.handle = image;
+
+	if (x >= (EGGint)cast.image->w || y >= (EGGint)cast.image->h)
 		return; // on overlaps
 
 	left = x + width;
@@ -778,11 +783,11 @@ void eggImageSubData(EGGImage image, const void * data, EGGint pitch, EGGint x, 
 	if (left < 0 || bottom < 0)
 		return; // on overlaps
 
-	if (left > (EGGint)img->w)
-		width -= left - img->w;
+	if (left > (EGGint)cast.image->w)
+		width -= left - cast.image->w;
 
-	if (bottom > (EGGint)img->h)
-		height -= bottom - img->h;
+	if (bottom > (EGGint)cast.image->h)
+		height -= bottom - cast.image->h;
 
 	if (x < 0)
 	{
@@ -800,15 +805,16 @@ void eggImageSubData(EGGImage image, const void * data, EGGint pitch, EGGint x, 
 
 void eggDestroyImage( EGGImage image )
 {
-	_EGGImage* img;
+	union EGGImageCast cast;
+
 	if (image == EGG_INVALID_HANDLE)
 		return;
+	cast.handle = image;
 
-	img = (_EGGImage*)image;
-	if (strcmp(img->sig, "IMG") != 0)
+	if (strcmp(cast.image->sig, "IMG") != 0)
 		return;
 
-	free((void*)image);
+	free(cast.image);
 }
 
 
@@ -816,9 +822,12 @@ void eggDestroyImage( EGGImage image )
 
 EGG_API void eggDrawImage( EGGImage image, EGGint dx, EGGint dy )
 {
-	blit_fn blit;
-	const _EGGImage* img = (const _EGGImage*)image;
+	union EGGImageCast cast;
 	EGGMetrics metrics;
+	blit_fn blit;	
+
+	cast.handle = image;
+	
 	if (context.surface.pixels == NULL)
 	{
 		context.errorcode = EGG_NO_CONTEXT_ERROR;
@@ -828,7 +837,7 @@ EGG_API void eggDrawImage( EGGImage image, EGGint dx, EGGint dy )
 	if (context.alpha == 0) // nothing to draw due to global alpha is zero
 		return;
 
-	blit = get_blit_function(context.alpha, context.colorkey, img->format);
+	blit = get_blit_function(context.alpha, context.colorkey, cast.image->format);
 	if (!blit)
 	{
 		context.errorcode = EGG_UNSUPPORTED_IMAGE_FORMAT_ERROR;
@@ -839,11 +848,11 @@ EGG_API void eggDrawImage( EGGImage image, EGGint dx, EGGint dy )
 	metrics.dy = dy;
 	metrics.sx = 0;
 	metrics.sy = 0;
-	metrics.w = img->w;
-	metrics.h = img->h;
+	metrics.w = cast.image->w;
+	metrics.h = cast.image->h;
 
 	if (!get_final_metrics(&metrics, context.surface.w, context.surface.h))
 		return;
 
-	blit(img, &context.surface, context.alpha, &metrics);
+	blit(cast.image, &context.surface, context.alpha, &metrics);
 }
