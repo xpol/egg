@@ -684,7 +684,7 @@ const EGGMetrics* get_final_metrics(EGGMetrics* metrics, const int limtX, const 
 }
 
 
-blit_fn get_blit_function(EGGbyte alpha, EGGboolean colorkey, EGGImageFormat fmt)
+blit_fn get_blit_function(EGGubyte alpha, EGGboolean colorkey, EGGImageFormat fmt)
 {
 	int ia = alpha != 255;
 	int ikc = colorkey != 0;
