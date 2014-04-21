@@ -3,19 +3,12 @@
 #include <string.h>
 #include <stdlib.h>
 
-typedef struct EGGImage {
-    EGGint format;
-    EGGuint depth;
-    EGGuint w;
-    EGGuint h;
-    EGGint pitch;
-    EGGubyte* pixels;
-} EGGImage;
+#include "internal.h"
 
 typedef struct EGGContext {
 	EGGErrorCode errorcode;
 
-	EGGImage surface;
+	_EGGImage surface;
 	void* buffers[2];
 	EGGubyte current;
 	EGGubyte alpha;
@@ -326,9 +319,9 @@ static const unsigned char _6x4[64][16] = {
     for (xi_init_odd(T, metrics, BITS); xi_hasnext(); xi_next_odd(BITS))
 
 
-typedef void (*blit_fn)(EGGImage *src, EGGImage *dst, unsigned char alpha, const EGGMetrics* metrics);
+typedef void (*blit_fn)(const _EGGImage *src, _EGGImage *dst, unsigned char alpha, const EGGMetrics* metrics);
 
-static void _blit_565_no_extra_alpha(EGGImage *src, EGGImage *dst, unsigned char alpha, const EGGMetrics* metrics)
+static void _blit_565_no_extra_alpha(const _EGGImage *src, _EGGImage *dst, unsigned char alpha, const EGGMetrics* metrics)
 {
     def_y_iterator();
     size_t sz;
@@ -353,7 +346,7 @@ static void _blit_565_no_extra_alpha(EGGImage *src, EGGImage *dst, unsigned char
     }
 }
 
-static void _blit_565(EGGImage *src, EGGImage *dst, unsigned char alpha, const EGGMetrics* metrics)
+static void _blit_565(const _EGGImage *src, _EGGImage *dst, unsigned char alpha, const EGGMetrics* metrics)
 {
     def_y_iterator();
     def_x_iterator(unsigned short, metrics);
@@ -386,7 +379,7 @@ static void _blit_565(EGGImage *src, EGGImage *dst, unsigned char alpha, const E
 
 
 
-static void _blit_565kc_no_extra_alpha(EGGImage *src, EGGImage *dst, unsigned char alpha, const EGGMetrics* metrics)
+static void _blit_565kc_no_extra_alpha(const _EGGImage *src, _EGGImage *dst, unsigned char alpha, const EGGMetrics* metrics)
 {
 
     def_y_iterator();
@@ -403,7 +396,7 @@ static void _blit_565kc_no_extra_alpha(EGGImage *src, EGGImage *dst, unsigned ch
 
 
 
-static void _blit_565kc(EGGImage *src, EGGImage *dst, unsigned char alpha, const EGGMetrics* metrics)
+static void _blit_565kc(const _EGGImage *src, _EGGImage *dst, unsigned char alpha, const EGGMetrics* metrics)
 {
     def_y_iterator();
     def_x_iterator(unsigned short, metrics);
@@ -434,7 +427,7 @@ static void _blit_565kc(EGGImage *src, EGGImage *dst, unsigned char alpha, const
 }
 
 
-static void _blit_5551_no_extra_alpha(EGGImage *src, EGGImage *dst, unsigned char alpha, const EGGMetrics* metrics)
+static void _blit_5551_no_extra_alpha(const _EGGImage *src, _EGGImage *dst, unsigned char alpha, const EGGMetrics* metrics)
 {
     def_y_iterator();
     def_x_iterator(unsigned short, metrics);
@@ -449,7 +442,7 @@ static void _blit_5551_no_extra_alpha(EGGImage *src, EGGImage *dst, unsigned cha
 }
 
 
-static void _blit_5551(EGGImage *src, EGGImage *dst, unsigned char alpha, const EGGMetrics* metrics)
+static void _blit_5551(const _EGGImage *src, _EGGImage *dst, unsigned char alpha, const EGGMetrics* metrics)
 {
     def_y_iterator();
     def_x_iterator(unsigned short, metrics);
@@ -478,7 +471,7 @@ static void _blit_5551(EGGImage *src, EGGImage *dst, unsigned char alpha, const 
     }}
 }
 
-static void _blit_4444_no_extra_alpha(EGGImage *src, EGGImage *dst, unsigned char alpha, const EGGMetrics* metrics)
+static void _blit_4444_no_extra_alpha(const _EGGImage *src, _EGGImage *dst, unsigned char alpha, const EGGMetrics* metrics)
 {
     def_y_iterator();
     def_x_iterator(unsigned short, metrics);
@@ -508,7 +501,7 @@ static void _blit_4444_no_extra_alpha(EGGImage *src, EGGImage *dst, unsigned cha
     }}
 }
 
-static void _blit_4444(EGGImage *src, EGGImage* dst, unsigned char alpha, const EGGMetrics* metrics)
+static void _blit_4444(const _EGGImage *src, _EGGImage *dst, unsigned char alpha, const EGGMetrics* metrics)
 {
     def_y_iterator();
     def_x_iterator(unsigned short, metrics);
@@ -704,35 +697,7 @@ blit_fn get_blit_function(EGGbyte alpha, EGGboolean colorkey, EGGImageFormat fmt
 
 void eggWritePixels(const void * data, EGGImageFormat fmt, EGGint dx, EGGint dy, EGGint width,  EGGint height, EGGint pitch)
 {
-	blit_fn blit;
-	EGGImage img;
-	EGGMetrics metrics;
-	if (context.surface.pixels == NULL)
-	{
-		context.errorcode = EGG_NO_CONTEXT_ERROR;
-		return;
-	}
-
-	if (context.alpha == 0) // nothing to draw due to global alpha is zero
-		return;
-
-	blit = get_blit_function(context.alpha, context.colorkey, fmt);
-	if (!blit)
-	{
-		context.errorcode = EGG_UNSUPPORTED_IMAGE_FORMAT_ERROR;
-		return;
-	}
-
-	metrics.dx = dx;
-	metrics.dy = dy;
-	metrics.sx = 0;
-	metrics.sy = 0;
-	metrics.w = width;
-	metrics.h = height;
-
-	if (!get_final_metrics(&metrics, context.surface.w, context.surface.h))
-		return;
-
+	_EGGImage img;
 
 	img.format = fmt;
 	img.w = width;
@@ -741,8 +706,7 @@ void eggWritePixels(const void * data, EGGImageFormat fmt, EGGint dx, EGGint dy,
 	img.depth = 16;
 	img.pixels = (EGGubyte*)data;
 
-
-	blit(&img, &context.surface, context.alpha, &metrics);
+	eggDrawImage((EGGImage)(&img), dx, dy);
 }
 
 EGG_API void eggFlush()
@@ -756,3 +720,130 @@ EGG_API void* eggDisplayBuffer()
 	return context.buffers[!context.current];
 }
 
+
+
+EGGImage eggCreateImage(EGGImageFormat fmt, EGGint width, EGGint height)
+{
+	EGGint pitch = width * 16/ 8;
+	_EGGImage *img = malloc(sizeof(*img) + pitch * height);
+	if (!img)
+		return EGG_INVALID_HANDLE;
+
+	img->sig[0] = 'I';
+	img->sig[1] = 'M';
+	img->sig[2] = 'G';
+	img->sig[3] = '\0';
+
+	img->depth = 16; // we currently only support 16 bit images
+	img->format = fmt;
+	img->w = width;
+	img->h = height;
+	img->pitch = pitch;
+	img->pixels = (EGGubyte*)(img)+sizeof(*img);
+	
+	return (EGGImage)img;
+}
+
+static void copy16(EGGImage image, const void * data, EGGint pitch, EGGint x, EGGint y, EGGint width, EGGint height)
+{
+	_EGGImage* img = (_EGGImage*)(image);
+	const EGGubyte* src = (const EGGubyte*)(data);
+	EGGubyte* dst = img->pixels + y*img->pitch + x*2;
+
+	int i;
+	for (i = 0; i < height; i++)
+	{
+		memcpy(dst, src, pitch);
+		dst += img->pitch;
+		src += pitch;
+	}
+}
+
+
+
+static void convert( EGGImage image, const void * data, EGGint pitch, EGGint x, EGGint y, EGGint width, EGGint height )
+{
+	 // converting not supported yet
+}
+
+void eggImageSubData(EGGImage image, const void * data, EGGint pitch, EGGint x, EGGint y, EGGint width, EGGint height)
+{
+	_EGGImage* img = (_EGGImage*)(image);
+	int left, bottom;
+	if (x >= (EGGint)img->w || y >= (EGGint)img->h)
+		return; // on overlaps
+
+	left = x + width;
+	bottom = y + height;
+	if (left < 0 || bottom < 0)
+		return; // on overlaps
+
+	if (left > (EGGint)img->w)
+		width -= left - img->w;
+
+	if (bottom > (EGGint)img->h)
+		height -= bottom - img->h;
+
+	if (x < 0)
+	{
+		width += x;
+		x = 0;
+	}
+	if (y < 0)
+	{
+		height += y;
+		y = 0;
+	}
+
+	copy16(image, data, pitch, x, y, width, height);
+}
+
+void eggDestroyImage( EGGImage image )
+{
+	_EGGImage* img;
+	if (image == EGG_INVALID_HANDLE)
+		return;
+
+	img = (_EGGImage*)image;
+	if (strcmp(img->sig, "IMG") != 0)
+		return;
+
+	free((void*)image);
+}
+
+
+
+
+EGG_API void eggDrawImage( EGGImage image, EGGint dx, EGGint dy )
+{
+	blit_fn blit;
+	const _EGGImage* img = (const _EGGImage*)image;
+	EGGMetrics metrics;
+	if (context.surface.pixels == NULL)
+	{
+		context.errorcode = EGG_NO_CONTEXT_ERROR;
+		return;
+	}
+
+	if (context.alpha == 0) // nothing to draw due to global alpha is zero
+		return;
+
+	blit = get_blit_function(context.alpha, context.colorkey, img->format);
+	if (!blit)
+	{
+		context.errorcode = EGG_UNSUPPORTED_IMAGE_FORMAT_ERROR;
+		return;
+	}
+
+	metrics.dx = dx;
+	metrics.dy = dy;
+	metrics.sx = 0;
+	metrics.sy = 0;
+	metrics.w = img->w;
+	metrics.h = img->h;
+
+	if (!get_final_metrics(&metrics, context.surface.w, context.surface.h))
+		return;
+
+	blit(img, &context.surface, context.alpha, &metrics);
+}

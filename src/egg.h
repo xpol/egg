@@ -5,6 +5,8 @@
 extern "C" {
 #endif
 
+#include <stddef.h>
+
 #define EGG_API			extern
 
 typedef float          EGGfloat;
@@ -14,6 +16,9 @@ typedef signed short   EGGshort;
 typedef signed int     EGGint;
 typedef unsigned int   EGGuint;
 
+typedef EGGuint EGGHandle;
+#define EGG_INVALID_HANDLE ((EGGHandle)0)
+
 #ifndef EGG_MAX_ENUM
 #define EGG_MAX_ENUM 0x7FFFFFFF
 #endif
@@ -21,7 +26,7 @@ typedef unsigned int   EGGuint;
 
 typedef enum EGGboolean{
 	EGG_FALSE               = 0,
-	VG_TRUE                = 1,
+	EGG_TRUE                = 1,
 
 	EGG_BOOLEAN_FORCE_SIZE  = EGG_MAX_ENUM
 } EGGboolean;
@@ -56,6 +61,35 @@ typedef enum EGGImageFormat
 	EGG_IMAGEFORMAT_FORCE_SIZE  = EGG_MAX_ENUM
 } EGGImageFormat;
 
+typedef EGGHandle EGGImage;
+
+#define EGG_SEEK_CUR    1
+#define EGG_SEEK_END    2
+#define EGG_SEEK_SET    0
+
+typedef void (*EGGReader)(void* io, void* data, size_t size);
+typedef void (*EGGSeek)(void* io, long int offset, int origin);
+
+typedef enum {
+	EGG_IMAGE_FORMAT = 0x1E00,
+	EGG_IMAGE_WIDTH  = 0x1E01,
+	EGG_IMAGE_HEIGHT = 0x1E02
+} EGGImageParamType;
+
+EGGImage eggCreateImage(EGGImageFormat fmt, EGGint width,  EGGint height);
+
+void eggImageSubData(EGGImage image, const void * data, EGGint pitch, EGGint x, EGGint y, EGGint width, EGGint height);
+
+EGGImage eggLoadPVRImage(void* handle, EGGReader readfn, EGGSeek seekfn);
+
+void eggDestroyImage(EGGImage image);
+
+// Set params
+EGG_API void eggSetParameteri(EGGImage image, EGGint paramType, EGGint value);
+
+// Get params
+EGG_API EGGint eggGetParameteri(EGGImage image, EGGint paramType);
+
 
 // Init double buffer for drawing
 EGG_API void eggInit(void* buffers[2], EGGImageFormat format, EGGuint width, EGGuint height, EGGint pitch);
@@ -74,6 +108,8 @@ EGG_API EGGint eggGeti(EGGParamType param);
 
 // Draw image pixels
 EGG_API void eggWritePixels(const void * data, EGGImageFormat fmt, EGGint dx, EGGint dy, EGGint width,  EGGint height, EGGint pitch);
+
+EGG_API void eggDrawImage(EGGImage image, EGGint dx, EGGint dy);
 
 // Finish drawing by swap buffers
 EGG_API void eggFlush();
