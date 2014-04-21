@@ -9,3 +9,8 @@ typedef struct _EGGImage {
 	EGGint pitch;
 	EGGubyte* pixels;
 } _EGGImage;
+
+union EGGImageCast {
+	_EGGImage* image;
+	EGGImage handle;
+};
