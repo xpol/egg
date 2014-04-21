@@ -1,8 +1,7 @@
 #include "egg.h"
 
 
-#if defined(_MSC_VER)
-#if (_MSC_VER >= 1700)
+#if !defined(_MSC_VER) || (_MSC_VER >= 1700)
 #include <stdint.h>
 #else
 typedef   signed __int8		int8_t;
@@ -14,7 +13,6 @@ typedef unsigned __int16	uint16_t;
 typedef unsigned __int32	uint32_t;
 typedef unsigned __int64    uint64_t;
 
-#endif
 #endif
 
 #include <stdlib.h>
