@@ -16,7 +16,7 @@ typedef signed short   EGGshort;
 typedef signed int     EGGint;
 typedef unsigned int   EGGuint;
 
-typedef EGGuint EGGHandle;
+typedef uintptr_t EGGHandle;
 #define EGG_INVALID_HANDLE ((EGGHandle)0)
 
 #ifndef EGG_MAX_ENUM
