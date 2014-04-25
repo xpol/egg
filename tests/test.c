@@ -151,22 +151,27 @@ EGGboolean verifyColor(EGGImage image, char* expr)
 // xxx.pvr RGB565:wxh (x,y,0xRRGGBBAA)
 int main(int argc, char *argv[])
 {
-	EGGImage image;
+	EGGImage image = EGG_INVALID_HANDLE;
 	int i;
 	if (argc < 2)
-		return EXIT_FAILURE;
+		goto fail;
 
 	image = loadPVR(argv[1]);
 	if (image == EGG_INVALID_HANDLE)
-		return EXIT_FAILURE;
+		goto fail;
 
 	if (argc > 2 && !verifyImage(image, argv[2]))
-		return EXIT_FAILURE;
+		goto fail;
 	
 	for (i = 3; i < argc; i++)
 	{
 		if (!verifyColor(image, argv[i]))
-			return EXIT_FAILURE;
+			goto fail;
 	}
+
+	eggDestroyImage(image);
 	return EXIT_SUCCESS;
+fail:
+	eggDestroyImage(image);
+	return EXIT_FAILURE;
 }
