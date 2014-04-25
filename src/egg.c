@@ -2,6 +2,7 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "internal.h"
 
@@ -326,10 +327,16 @@ static _EGGImage* toImage(EGGImage handle)
 {
 	union EGGImageCast cast;
 	if (handle == EGG_INVALID_HANDLE)
+	{
+		puts("EGG_INVALID_HANDLE");
 		return NULL;
+	}
 	cast.handle = handle;
 	if (strcmp(cast.image->sig, "IMG") != 0)
+	{
+		puts("sig not match");
 		return NULL;
+	}
 	return cast.image;
 }
 
@@ -337,10 +344,17 @@ static EGGImage toHandle(_EGGImage* image)
 {
 	union EGGImageCast cast;
 	if (!image)
+	{
+		puts("NULL image");
 		return EGG_INVALID_HANDLE;
+	}
 
 	if (strcmp(image->sig, "IMG") != 0)
+
+	{
+		puts("sig not match");
 		return EGG_INVALID_HANDLE;
+	}
 
 	cast.image = image;
 	return cast.handle;

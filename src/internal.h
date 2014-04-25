@@ -1,3 +1,6 @@
+#ifndef __EGG_INTERNAL_H__
+#define __EGG_INTERNAL_H__
+
 #include "egg.h"
 
 typedef struct _EGGImage {
@@ -14,3 +17,5 @@ union EGGImageCast {
 	_EGGImage* image;
 	EGGImage handle;
 };
+
+#endif
