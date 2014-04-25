@@ -564,17 +564,19 @@ static void _blit_4444(const _EGGImage *src, _EGGImage *dst, unsigned char alpha
     }}
 }
 
-static EGGContext context = {0};
+static EGGContext context;
 
 
 void eggInit(void* buffers[2], EGGImageFormat format, EGGuint w, EGGuint h, EGGint pitch)
 {
+	memset(&context, 0, sizeof(context));
+
 	if (format != EGG_RGB565)
 	{
 		context.errorcode = EGG_ILLEGAL_ARGUMENT_ERROR;
 		return;
 	}
-
+	
 	context.surface.format = format;
 	context.surface.w = w;
 	context.surface.h = h;
@@ -749,7 +751,7 @@ EGG_API void* eggDisplayBuffer()
 EGGImage eggCreateImage(EGGImageFormat fmt, EGGint width, EGGint height)
 {
 	EGGint pitch = width * 16/ 8;
-	_EGGImage* image = malloc(sizeof(*image) + pitch * height);
+	_EGGImage* image = calloc(sizeof(*image) + pitch * height, 1);
 	if (!image)
 		return EGG_INVALID_HANDLE;
 

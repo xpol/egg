@@ -86,16 +86,16 @@ const PVR3Format* getFormat(uint64_t pvrfmt)
 
 EGGImage eggLoadPVRImage(void* io, EGGReader readfn, EGGSeek seekfn)
 {
-	PVR3Header header={0};
+	PVR3Header header;
 	EGGboolean pre_multiplied;
 	EGGImage img;
-	
 	const PVR3Format* fmt;
 	unsigned y;
 	size_t pitch;
 	EGGubyte* linebuffer;
 	//EGGboolean swap;
 
+	memset(&header, 0, sizeof(header));
 	if (readfn(io, &header, PVR3HEADER_SIZE) != PVR3HEADER_SIZE)
 		return EGG_INVALID_HANDLE;
 
