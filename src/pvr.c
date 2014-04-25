@@ -75,7 +75,7 @@ static uint64_t __bswap_64( uint64_t val )
 
 const PVR3Format* getFormat(uint64_t pvrfmt)
 {
-	int i;
+	size_t i;
 	for (i = 0; i < sizeof(PVRFORMATS)/sizeof(PVRFORMATS[0]); i++)
 	{
 		if (PVRFORMATS[i].pvr == pvrfmt)

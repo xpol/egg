@@ -705,7 +705,7 @@ blit_fn get_blit_function(EGGubyte alpha, EGGboolean colorkey, EGGImageFormat fm
 	int ia = alpha != 255;
 	int ikc = colorkey != 0;
 	int ifmt = fmt - EGG_RGB565;
-	if (ifmt >= sizeof(blit_functions[0][0])/ sizeof(blit_functions[0][0][0]))
+	if (ifmt >= (int)(sizeof(blit_functions[0][0])/ sizeof(blit_functions[0][0][0])))
 		return NULL;
 	return blit_functions[ia][ikc][ifmt];
 }
