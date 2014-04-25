@@ -325,13 +325,23 @@ typedef void (*blit_fn)(const _EGGImage *src, _EGGImage *dst, unsigned char alph
 static _EGGImage* toImage(EGGImage handle)
 {
 	union EGGImageCast cast;
+	if (handle == EGG_INVALID_HANDLE)
+		return NULL;
 	cast.handle = handle;
+	if (strcmp(cast.image->sig, "IMG") != 0)
+		return NULL;
 	return cast.image;
 }
 
 static EGGImage toHandle(_EGGImage* image)
 {
 	union EGGImageCast cast;
+	if (!image)
+		return EGG_INVALID_HANDLE;
+
+	if (strcmp(image->sig, "IMG") != 0)
+		return EGG_INVALID_HANDLE;
+
 	cast.image = image;
 	return cast.handle;
 }
