@@ -321,13 +321,29 @@ static const unsigned char _6x4[64][16] = {
 
 typedef void (*blit_fn)(const _EGGImage *src, _EGGImage *dst, unsigned char alpha, const EGGMetrics* metrics);
 
+
+static _EGGImage* toImage(EGGImage handle)
+{
+	union EGGImageCast cast;
+	cast.handle = handle;
+	return cast.image;
+}
+
+static EGGImage toHandle(_EGGImage* image)
+{
+	union EGGImageCast cast;
+	cast.image = image;
+	return cast.handle;
+}
+
+
 static void _blit_565_no_extra_alpha(const _EGGImage *src, _EGGImage *dst, unsigned char alpha, const EGGMetrics* metrics)
 {
     def_y_iterator();
     size_t sz;
     (void)(alpha); // where alpha == 0xFF
 
-    if (src->w == dst->w && metrics->w == src->w // full screen src
+    if ((EGGuint)src->w == dst->w && (EGGuint)metrics->w == src->w // full screen src
         && metrics->sx == 0 && metrics->dx == 0) // place at (0, y)
     {
         // copy all lines at once!
@@ -585,7 +601,7 @@ void eggSeti(EGGParamType param, int value)
 	case EGG_ALPHA:
 		if (value < 0 || value > 255)
 			context.errorcode = EGG_ILLEGAL_ARGUMENT_ERROR;
-		context.alpha = value;
+		context.alpha = (EGGubyte)value;
 		break;
 	case EGG_COLORKEY:
 		context.colorkey = value;
@@ -698,7 +714,6 @@ blit_fn get_blit_function(EGGubyte alpha, EGGboolean colorkey, EGGImageFormat fm
 void eggWritePixels(const void * data, EGGImageFormat fmt, EGGint dx, EGGint dy, EGGint width,  EGGint height, EGGint pitch)
 {
 	_EGGImage img;
-	union EGGImageCast cast = {&img};
 
 	img.format = fmt;
 	img.w = width;
@@ -707,7 +722,7 @@ void eggWritePixels(const void * data, EGGImageFormat fmt, EGGint dx, EGGint dy,
 	img.depth = 16;
 	img.pixels = (EGGubyte*)data;
 
-	eggDrawImage(cast.handle, dx, dy);
+	eggDrawImage(toHandle(&img), dx, dy);
 }
 
 EGG_API void eggFlush()
@@ -721,102 +736,116 @@ EGG_API void* eggDisplayBuffer()
 	return context.buffers[!context.current];
 }
 
-
-
 EGGImage eggCreateImage(EGGImageFormat fmt, EGGint width, EGGint height)
 {
 	EGGint pitch = width * 16/ 8;
-	union EGGImageCast cast;
-	cast.image = malloc(sizeof(*cast.image) + pitch * height);
-	if (!cast.image)
+	_EGGImage* image = malloc(sizeof(*image) + pitch * height);
+	if (!image)
 		return EGG_INVALID_HANDLE;
 
-	cast.image->sig[0] = 'I';
-	cast.image->sig[1] = 'M';
-	cast.image->sig[2] = 'G';
-	cast.image->sig[3] = '\0';
+	image->sig[0] = 'I';
+	image->sig[1] = 'M';
+	image->sig[2] = 'G';
+	image->sig[3] = '\0';
 
-	cast.image->depth = 16; // we currently only support 16 bit images
-	cast.image->format = fmt;
-	cast.image->w = width;
-	cast.image->h = height;
-	cast.image->pitch = pitch;
-	cast.image->pixels = (EGGubyte*)(cast.image)+sizeof(*cast.image);
+	image->depth = 16; // we currently only support 16 bit images
+	image->format = fmt;
+	image->w = width;
+	image->h = height;
+	image->pitch = pitch;
+	image->pixels = (EGGubyte*)(image)+sizeof(*image);
 	
-	return cast.handle;
+	return toHandle(image);
 }
 
-static void copy16(EGGImage image, const void * data, EGGint pitch, EGGint x, EGGint y, EGGint width, EGGint height)
+void eggDestroyImage( EGGImage image )
 {
-	int i;
-	union EGGImageCast cast;
-	const EGGubyte* src;
-	EGGubyte* dst;
+	_EGGImage* img;
 
-	cast.handle = image;
+	if (image == EGG_INVALID_HANDLE)
+		return;
+	img = toImage(image);
 
-	dst = cast.image->pixels + y*cast.image->pitch + x*2;
-	src = (const EGGubyte*)(data);
+	if (strcmp(img->sig, "IMG") != 0)
+		return;
 
-	for (i = 0; i < height; i++)
+	free(img);
+}
+
+
+static EGGboolean overlapped(_EGGImage *dest, EGGint *x, EGGint *y, EGGint *width, EGGint *height)
+{
+	int left, bottom;
+
+	if (*x >= (EGGint)dest->w || *y >= (EGGint)dest->h)
+		return EGG_FALSE; // on overlaps
+
+	left = *x + *width;
+	bottom = *y + *height;
+	if (left < 0 || bottom < 0)
+		return EGG_FALSE; // on overlaps
+
+	if (left > (EGGint)dest->w)
+		*width -= left - dest->w;
+
+	if (bottom > (EGGint)dest->h)
+		*height -= bottom - dest->h;
+
+	if (*x < 0)
 	{
-		memcpy(dst, src, pitch);
-		dst += cast.image->pitch;
-		src += pitch;
+		*width += *x;
+		*x = 0;
 	}
+	if (*y < 0)
+	{
+		*height += *y;
+		*y = 0;
+	}
+	return EGG_TRUE;
 }
 
 
 
 void eggImageSubData(EGGImage image, const void * data, EGGint pitch, EGGint x, EGGint y, EGGint width, EGGint height)
 {
-	union EGGImageCast cast;
-	int left, bottom;
-	cast.handle = image;
+	_EGGImage* img = toImage(image);
+	const EGGubyte* src;
+	EGGubyte* dst;
+	int i;
+	if (!overlapped(img, &x, &y, &width, &height))
+		return;
 
-	if (x >= (EGGint)cast.image->w || y >= (EGGint)cast.image->h)
-		return; // on overlaps
+	src = (const EGGubyte*)(data);
+	dst = img->pixels + y*img->pitch + x*2;
 
-	left = x + width;
-	bottom = y + height;
-	if (left < 0 || bottom < 0)
-		return; // on overlaps
-
-	if (left > (EGGint)cast.image->w)
-		width -= left - cast.image->w;
-
-	if (bottom > (EGGint)cast.image->h)
-		height -= bottom - cast.image->h;
-
-	if (x < 0)
+	for (i = 0; i < height; i++)
 	{
-		width += x;
-		x = 0;
+		memcpy(dst, src, width*2);
+		dst += img->pitch;
+		src += pitch;
 	}
-	if (y < 0)
-	{
-		height += y;
-		y = 0;
-	}
-
-	copy16(image, data, pitch, x, y, width, height);
 }
 
-void eggDestroyImage( EGGImage image )
+void eggGetImageSubData( EGGImage image, void * data, EGGint pitch, EGGint x, EGGint y, EGGint width, EGGint height )
 {
-	union EGGImageCast cast;
+	_EGGImage* img = toImage(image);
+	const EGGubyte* src;
+	EGGubyte* dst;
+	int i;
 
-	if (image == EGG_INVALID_HANDLE)
+	if (!overlapped(img, &x, &y, &width, &height))
 		return;
-	cast.handle = image;
 
-	if (strcmp(cast.image->sig, "IMG") != 0)
-		return;
+	src = img->pixels + y*img->pitch + x*2;
+	dst = (EGGubyte*)(data);
 
-	free(cast.image);
+	for (i = 0; i < height; i++)
+	{
+		memcpy(dst, src, width*2);
+		dst += pitch;
+		src += img->pitch;
+	}
 }
-
-
 
 
 EGG_API void eggDrawImage( EGGImage image, EGGint dx, EGGint dy )
@@ -854,4 +883,20 @@ EGG_API void eggDrawImage( EGGImage image, EGGint dx, EGGint dy )
 		return;
 
 	blit(cast.image, &context.surface, context.alpha, &metrics);
+}
+
+
+EGG_API EGGint eggGetParameteri( EGGHandle object, EGGint paramType )
+{
+	switch (paramType)
+	{
+	case EGG_IMAGE_FORMAT:
+		return toImage(object)->format;
+	case EGG_IMAGE_WIDTH:
+		return toImage(object)->w;
+	case EGG_IMAGE_HEIGHT:
+		return toImage(object)->h;
+	default:
+		return EGG_UNSUPPORTED_IMAGE_FORMAT_ERROR;
+	}
 }

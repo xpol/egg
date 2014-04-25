@@ -67,8 +67,8 @@ typedef EGGHandle EGGImage;
 #define EGG_SEEK_END    2
 #define EGG_SEEK_SET    0
 
-typedef void (*EGGReader)(void* io, void* data, size_t size);
-typedef void (*EGGSeek)(void* io, long int offset, int origin);
+typedef size_t (*EGGReader)(void* io, void* data, size_t size);
+typedef EGGboolean (*EGGSeek)(void* io, long int offset, int origin);
 
 typedef enum {
 	EGG_IMAGE_FORMAT = 0x1E00,
@@ -78,17 +78,19 @@ typedef enum {
 
 EGGImage eggCreateImage(EGGImageFormat fmt, EGGint width,  EGGint height);
 
+void eggDestroyImage(EGGImage image);
+
 void eggImageSubData(EGGImage image, const void * data, EGGint pitch, EGGint x, EGGint y, EGGint width, EGGint height);
+
+
+void eggGetImageSubData(EGGImage image, void * data, EGGint pitch, EGGint x, EGGint y, EGGint width, EGGint height);
+
 
 EGGImage eggLoadPVRImage(void* handle, EGGReader readfn, EGGSeek seekfn);
 
-void eggDestroyImage(EGGImage image);
-
-// Set params
-EGG_API void eggSetParameteri(EGGImage image, EGGint paramType, EGGint value);
 
 // Get params
-EGG_API EGGint eggGetParameteri(EGGImage image, EGGint paramType);
+EGG_API EGGint eggGetParameteri(EGGHandle object, EGGint paramType);
 
 
 // Init double buffer for drawing

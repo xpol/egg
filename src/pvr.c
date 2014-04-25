@@ -57,6 +57,8 @@ typedef struct {
 	uint32_t metadataLength;
 } PVR3Header;
 
+#define PVR3HEADER_SIZE 52 // can use sizeof cause of padding...
+
 /*
 static uint32_t __bswap_32( uint32_t val )
 {
@@ -84,7 +86,7 @@ const PVR3Format* getFormat(uint64_t pvrfmt)
 
 EGGImage eggLoadPVRImage(void* io, EGGReader readfn, EGGSeek seekfn)
 {
-	PVR3Header header;
+	PVR3Header header={0};
 	EGGboolean pre_multiplied;
 	EGGImage img;
 	
@@ -92,12 +94,14 @@ EGGImage eggLoadPVRImage(void* io, EGGReader readfn, EGGSeek seekfn)
 	unsigned y;
 	size_t pitch;
 	EGGubyte* linebuffer;
+	EGGboolean swap;
 
-	readfn(io, &header, sizeof(header));
-
-	if (header.version != 0x50565203)  // header.version != 0x03525650 not supported yet.
+	if (readfn(io, &header, PVR3HEADER_SIZE) != PVR3HEADER_SIZE)
 		return EGG_INVALID_HANDLE;
 
+	if (header.version != 0x50565203 && header.version != 0x03525650)
+		return EGG_INVALID_HANDLE;
+	swap = header.version == 0x03525650;
 	pre_multiplied = (header.flags == 0x02);
 
 	fmt = getFormat(header.pixelFormat);
@@ -107,7 +111,8 @@ EGGImage eggLoadPVRImage(void* io, EGGReader readfn, EGGSeek seekfn)
 	if (!pre_multiplied && fmt->require_pre_multiplied)
 		return EGG_INVALID_HANDLE; // We don't want convert at run time.
 
-	seekfn(io, EGG_SEEK_CUR, header.metadataLength); // We currently don't care any meta data.
+	if (!seekfn(io, header.metadataLength, EGG_SEEK_CUR)) // We currently don't care any meta data.
+		return EGG_INVALID_HANDLE;
 
 	img = eggCreateImage(fmt->egg, header.width, header.height);
 	if (img == EGG_INVALID_HANDLE)
@@ -115,12 +120,12 @@ EGGImage eggLoadPVRImage(void* io, EGGReader readfn, EGGSeek seekfn)
 
 	// we only process top level mipmap.
 	pitch = header.width*fmt->depth/8;
-	linebuffer = malloc(pitch);
+	linebuffer = calloc(pitch, 1);
 	for (y = 0; y < header.height; y++)
 	{
 		readfn(io, linebuffer, pitch);
 		eggImageSubData(img, linebuffer, pitch, 0, y, header.width, 1);
 	}
-
+	free(linebuffer);
 	return img;
 }
