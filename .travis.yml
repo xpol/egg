@@ -2,5 +2,4 @@ language: c
 compiler:
   - gcc
   - clang
-before_script: sudo apt-get install valgrind
 script: make && make test
