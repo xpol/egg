@@ -2,4 +2,5 @@ language: c
 compiler:
   - gcc
   - clang
+before_script: sudo apt-get install gdb
 script: make && make test
