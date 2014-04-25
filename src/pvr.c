@@ -94,14 +94,14 @@ EGGImage eggLoadPVRImage(void* io, EGGReader readfn, EGGSeek seekfn)
 	unsigned y;
 	size_t pitch;
 	EGGubyte* linebuffer;
-	EGGboolean swap;
+	//EGGboolean swap;
 
 	if (readfn(io, &header, PVR3HEADER_SIZE) != PVR3HEADER_SIZE)
 		return EGG_INVALID_HANDLE;
 
 	if (header.version != 0x50565203 && header.version != 0x03525650)
 		return EGG_INVALID_HANDLE;
-	swap = header.version == 0x03525650;
+	//swap = header.version == 0x03525650;
 	pre_multiplied = (header.flags == 0x02);
 
 	fmt = getFormat(header.pixelFormat);
